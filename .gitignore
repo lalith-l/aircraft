@@ -12,3 +12,4 @@ nirnay_pdf_full.txt
 nirnay_pdf_new.txt
 *.pdf
 *.docx
+.scratch_venv/

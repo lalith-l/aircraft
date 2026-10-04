@@ -1,2 +1,2 @@
-Insert 10k items: 10.119s (988 items/sec)
+Insert 10k items: 9.886s (1012 items/sec)
 Fold 10k items: 0.002s

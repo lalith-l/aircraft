@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+htmlcov/
+*.egg-info/
+dist/
+build/
+.DS_Store
+nirnay_pdf_full.txt
+nirnay_pdf_new.txt
+*.pdf
+*.docx

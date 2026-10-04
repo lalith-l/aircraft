@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nirnay — Flight-Line AI</title>
+    <meta name="description" content="Mission-aware readiness system for fighter jet fleet management">
+    <style>
+        :root {
+            --bg-dark: #0a0e17;
+            --bg-card: #111827;
+            --bg-card-hover: #1a2332;
+            --border: #1e293b;
+            --text: #e2e8f0;
+            --text-dim: #94a3b8;
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.3);
+            --green: #22c55e;
+            --amber: #f59e0b;
+            --red: #ef4444;
+            --radius: 12px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        /* Nav */
+        nav {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 32px;
+            background: linear-gradient(135deg, #0f172a, #1e1b4b);
+            border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 100;
+        }
+        nav h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.5px; }
+        nav h1 span { color: var(--accent); }
+        .nav-tabs { display: flex; gap: 4px; }
+        .nav-tab {
+            padding: 8px 16px; border-radius: 8px; cursor: pointer;
+            font-size: 0.85rem; color: var(--text-dim); border: none;
+            background: transparent; transition: all 0.2s;
+        }
+        .nav-tab:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+        .nav-tab.active { background: var(--accent); color: white; }
+        .status-pill {
+            padding: 4px 12px; border-radius: 20px; font-size: 0.75rem;
+            background: rgba(34,197,94,0.15); color: var(--green); font-weight: 600;
+        }
+        /* Layout */
+        .screen { display: none; padding: 24px 32px; }
+        .screen.active { display: block; }
+        .grid { display: grid; gap: 16px; }
+        .grid-3 { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+        .grid-2 { grid-template-columns: 1fr 1fr; }
+        /* Cards */
+        .card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 20px;
+            transition: all 0.3s ease;
+        }
+        .card:hover { background: var(--bg-card-hover); border-color: var(--accent); box-shadow: 0 0 20px var(--accent-glow); }
+        .card-title { font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .card-value { font-size: 2rem; font-weight: 700; }
+        /* Health bands */
+        .band-green { color: var(--green); }
+        .band-amber { color: var(--amber); }
+        .band-red { color: var(--red); }
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .dot.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .dot.amber { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+        .dot.red { background: var(--red); box-shadow: 0 0 8px var(--red); }
+        /* Jet cards */
+        .jet-card { cursor: pointer; }
+        .jet-card .jet-id { font-size: 1.1rem; font-weight: 600; }
+        .jet-card .jet-health { font-size: 0.9rem; margin-top: 4px; }
+        .jet-card .health-bar { height: 4px; border-radius: 2px; background: var(--border); margin-top: 8px; overflow: hidden; }
+        .jet-card .health-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+        /* Table */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+        th { color: var(--text-dim); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; }
+        /* Buttons */
+        .btn {
+            padding: 10px 20px; border-radius: 8px; border: none;
+            font-size: 0.85rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: #2563eb; transform: translateY(-1px); }
+        /* Timeline */
+        .timeline { position: relative; padding-left: 24px; }
+        .timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+        .timeline-item { position: relative; margin-bottom: 16px; padding: 12px 16px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); }
+        .timeline-item::before { content: ''; position: absolute; left: -20px; top: 16px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+        /* Scenario cards */
+        .scenario-card { border-left: 3px solid var(--accent); }
+        .scenario-impact { color: var(--amber); font-size: 0.85rem; margin-top: 8px; }
+        /* Promise */
+        .promise-box { text-align: center; padding: 32px; background: linear-gradient(135deg, #1e1b4b, #0f172a); border-radius: var(--radius); }
+        .promise-number { font-size: 3rem; font-weight: 800; color: var(--green); }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } nav { padding: 12px 16px; } .screen { padding: 16px; } }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav>
+        <h1><span>निर्णय</span> Nirnay</h1>
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showScreen('fleet')" id="tab-fleet">Fleet Board</button>
+            <button class="nav-tab" onclick="showScreen('twin')" id="tab-twin">Aircraft Twin</button>
+            <button class="nav-tab" onclick="showScreen('passport')" id="tab-passport">Passport</button>
+            <button class="nav-tab" onclick="showScreen('windtunnel')" id="tab-windtunnel">Wind Tunnel</button>
+            <button class="nav-tab" onclick="showScreen('replay')" id="tab-replay">Replay</button>
+            <button class="nav-tab" onclick="showScreen('depot')" id="tab-depot">Depot</button>
+            <button class="nav-tab" onclick="showScreen('commander')" id="tab-commander">Commander</button>
+        </div>
+        <div class="status-pill" id="ws-status">● CONNECTED</div>
+    </nav>
+
+    <!-- Screen 1: Fleet Board -->
+    <div class="screen active" id="screen-fleet">
+        <div class="grid grid-3" style="margin-bottom:24px">
+            <div class="card">
+                <div class="card-title">Fleet Readiness</div>
+                <div class="card-value band-green" id="readiness-value">82%</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Mission Capable</div>
+                <div class="card-value" id="mc-count">10 / 12</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Surge Day</div>
+                <div class="card-value" id="day-value">1 / 30</div>
+            </div>
+        </div>
+        <h2 style="margin-bottom:16px;font-size:1.1rem">Aircraft Status</h2>
+        <div class="grid grid-3" id="jet-grid"></div>
+    </div>
+
+    <!-- Screen 2: Aircraft Twin -->
+    <div class="screen" id="screen-twin">
+        <h2 style="margin-bottom:16px">Aircraft Digital Twin</h2>
+        <p style="color:var(--text-dim);margin-bottom:16px">Select an aircraft from the Fleet Board to view its health tree.</p>
+        <div id="twin-content"></div>
+    </div>
+
+    <!-- Screen 3: Passport Viewer -->
+    <div class="screen" id="screen-passport">
+        <h2 style="margin-bottom:16px">Evidence Passport</h2>
+        <p style="color:var(--text-dim);margin-bottom:16px">Evidence timeline per part, belief curve, hash chain.</p>
+        <div id="passport-content"></div>
+    </div>
+
+    <!-- Screen 4: Wind Tunnel -->
+    <div class="screen" id="screen-windtunnel">
+        <h2 style="margin-bottom:16px">Wind Tunnel — What-If Scenarios</h2>
+        <div class="grid grid-2" id="scenario-grid"></div>
+    </div>
+
+    <!-- Screen 5: Replay -->
+    <div class="screen" id="screen-replay">
+        <h2 style="margin-bottom:16px">30-Day Surge Replay</h2>
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:24px">
+            <button class="btn btn-primary" onclick="prevDay()">◀ Prev</button>
+            <span id="replay-day" style="font-size:1.2rem;font-weight:600">Day 1</span>
+            <button class="btn btn-primary" onclick="nextDay()">Next ▶</button>
+        </div>
+        <div id="replay-events"></div>
+    </div>
+
+    <!-- Screen 6: Depot View -->
+    <div class="screen" id="screen-depot">
+        <h2 style="margin-bottom:16px">Depot — Teardown & NFF Resolution</h2>
+        <div id="depot-content"></div>
+    </div>
+
+    <!-- Screen 7: Commander View -->
+    <div class="screen" id="screen-commander">
+        <h2 style="margin-bottom:16px">Commander View</h2>
+        <div class="grid grid-2" id="commander-content"></div>
+    </div>
+
+    <script>
+    const API = '';
+    let ws = null;
+    let currentDay = 1;
+
+    // --- Navigation ---
+    function showScreen(name) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('screen-' + name).classList.add('active');
+        document.getElementById('tab-' + name).classList.add('active');
+        if (name === 'fleet') loadFleet();
+        if (name === 'windtunnel') loadWindTunnel();
+        if (name === 'replay') loadReplay(currentDay);
+        if (name === 'depot') loadDepot();
+        if (name === 'commander') loadCommander();
+    }
+
+    // --- Fleet Board ---
+    async function loadFleet() {
+        const res = await fetch(API + '/api/fleet');
+        const data = await res.json();
+        document.getElementById('readiness-value').textContent = Math.round(data.readiness * 100) + '%';
+        document.getElementById('mc-count').textContent = data.n_mission_capable + ' / ' + data.jets.length;
+        document.getElementById('day-value').textContent = data.day + ' / 30';
+        const grid = document.getElementById('jet-grid');
+        grid.innerHTML = data.jets.map(j => `
+            <div class="card jet-card" onclick="loadTwin('${j.id}')">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span class="jet-id">${j.id}</span>
+                    <span class="dot ${j.band}"></span>
+                </div>
+                <div class="jet-health band-${j.band}">${Math.round(j.health*100)}% health</div>
+                <div class="health-bar"><div class="health-fill" style="width:${j.health*100}%;background:var(--${j.band})"></div></div>
+                <div style="margin-top:8px;font-size:0.8rem;color:var(--text-dim)">${j.mission_capable ? '✓ Mission Capable' : '✗ Not Available'}</div>
+            </div>
+        `).join('');
+    }
+
+    // --- Aircraft Twin ---
+    async function loadTwin(jetId) {
+        showScreen('twin');
+        const res = await fetch(API + '/api/aircraft/' + jetId);
+        const data = await res.json();
+        const el = document.getElementById('twin-content');
+        el.innerHTML = `
+            <div class="card" style="margin-bottom:16px">
+                <h3>${data.jet.id} — Health: <span class="band-${data.jet.band}">${Math.round(data.jet.health*100)}%</span></h3>
+            </div>
+            <div class="grid grid-3">
+                ${data.parts.map(p => `
+                    <div class="card" onclick="loadPassport('${p.sn}')" style="cursor:pointer">
+                        <div style="display:flex;justify-content:space-between"><span>${p.name}</span><span class="dot ${p.band}"></span></div>
+                        <div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">${p.sn}</div>
+                        <div style="margin-top:8px;font-size:0.75rem">
+                            ${p.beliefs.map((b,i) => `<span style="color:${['var(--green)','#4ade80','var(--amber)','#fb923c','var(--red)'][i]}">${['H','G','D','S','F'][i]}:${(b*100).toFixed(0)}%</span> `).join('')}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    // --- Passport ---
+    async function loadPassport(partSn) {
+        showScreen('passport');
+        const res = await fetch(API + '/api/passport/' + partSn);
+        const data = await res.json();
+        const el = document.getElementById('passport-content');
+        el.innerHTML = `
+            <div class="card" style="margin-bottom:16px"><h3>Part: ${data.part_sn}</h3></div>
+            <div class="timeline">
+                ${data.timeline.map(e => `
+                    <div class="timeline-item">
+                        <div style="font-size:0.75rem;color:var(--text-dim)">${new Date(e.t*1000).toISOString().slice(0,16)} — ${e.source}</div>
+                        <div style="margin-top:4px">${e.summary}</div>
+                        <div style="margin-top:6px;font-size:0.75rem">
+                            ${e.belief_after.map((b,i) => `<span style="color:${['var(--green)','#4ade80','var(--amber)','#fb923c','var(--red)'][i]}">${['H','G','D','S','F'][i]}:${(b*100).toFixed(0)}%</span> `).join('')}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    // --- Wind Tunnel ---
+    async function loadWindTunnel() {
+        const res = await fetch(API + '/api/windtunnel');
+        const data = await res.json();
+        document.getElementById('scenario-grid').innerHTML = data.scenarios.map(s => `
+            <div class="card scenario-card">
+                <div class="card-title">${s.id}</div>
+                <h3 style="margin:8px 0">${s.name}</h3>
+                <p style="color:var(--text-dim);font-size:0.9rem">${s.description}</p>
+                <div class="scenario-impact">Impact: ${s.impact}</div>
+            </div>
+        `).join('');
+    }
+
+    // --- Replay ---
+    async function loadReplay(day) {
+        currentDay = day;
+        document.getElementById('replay-day').textContent = 'Day ' + day;
+        const res = await fetch(API + '/api/replay/' + day);
+        const data = await res.json();
+        document.getElementById('replay-events').innerHTML = `
+            <div class="card" style="margin-bottom:16px"><span class="card-title">Readiness</span> <span class="card-value" style="font-size:1.5rem">${Math.round(data.readiness*100)}%</span></div>
+            <table>
+                <tr><th>Time</th><th>Type</th><th>Aircraft</th><th>Detail</th></tr>
+                ${data.events.map(e => `<tr><td>${e.time}</td><td>${e.type}</td><td>${e.jet}</td><td>${e.detail}</td></tr>`).join('')}
+            </table>
+        `;
+    }
+    function prevDay() { if (currentDay > 1) loadReplay(currentDay - 1); }
+    function nextDay() { if (currentDay < 30) loadReplay(currentDay + 1); }
+
+    // --- Depot ---
+    async function loadDepot() {
+        const res = await fetch(API + '/api/depot');
+        const data = await res.json();
+        document.getElementById('depot-content').innerHTML = `
+            <h3 style="margin-bottom:12px">Teardowns</h3>
+            <table>
+                <tr><th>Part</th><th>Grade</th><th>NFF Resolved</th><th>Test Envelope</th></tr>
+                ${data.teardowns.map(t => `<tr><td>${t.part_sn}</td><td>${t.grade}</td><td>${t.nff_resolved ? '✓' : '✗'}</td><td>${t.test_envelope || '—'}</td></tr>`).join('')}
+            </table>
+            <h3 style="margin:24px 0 12px">Learning Curve</h3>
+            <div class="card">
+                ${data.learning_curve.weeks.map((w,i) => `<div style="display:inline-block;margin-right:24px"><span style="color:var(--text-dim)">Week ${w}:</span> <span class="band-green">${(data.learning_curve.accuracy[i]*100).toFixed(0)}%</span></div>`).join('')}
+            </div>
+        `;
+    }
+
+    // --- Commander ---
+    async function loadCommander() {
+        const res = await fetch(API + '/api/commander');
+        const data = await res.json();
+        document.getElementById('commander-content').innerHTML = `
+            <div class="promise-box">
+                <div class="card-title">Calibrated Promise</div>
+                <div class="promise-number">${data.promise.calibrated_readiness}</div>
+                <div style="color:var(--text-dim);margin-top:8px">aircraft (raw: ${data.promise.raw_readiness}, λ=${data.promise.lambda})</div>
+            </div>
+            <div>
+                <div class="card" style="margin-bottom:16px">
+                    <div class="card-title">Mission-Mix Frontier</div>
+                    <table>
+                        <tr><th>CAS</th><th>CAP</th><th>P(success)</th></tr>
+                        ${data.frontier.map(f => `<tr><td>${f.n_cas}</td><td>${f.n_cap}</td><td>${(f.p*100).toFixed(1)}%</td></tr>`).join('')}
+                    </table>
+                </div>
+                <div class="card">
+                    <div class="card-title">Shadow Prices (Buy List)</div>
+                    <table>
+                        <tr><th>Resource</th><th>Elasticity</th><th>Price</th></tr>
+                        ${data.shadow_prices.map(p => `<tr><td>${p.resource}</td><td>${p.elasticity}</td><td>$${p.price}</td></tr>`).join('')}
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+
+    // --- WebSocket ---
+    function connectWS() {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(proto + '//' + location.host + '/ws');
+        ws.onopen = () => { document.getElementById('ws-status').textContent = '● CONNECTED'; };
+        ws.onclose = () => { document.getElementById('ws-status').textContent = '○ OFFLINE'; setTimeout(connectWS, 3000); };
+        ws.onmessage = (e) => {
+            const msg = JSON.parse(e.data);
+            if (msg.type === 'day_update') { document.getElementById('day-value').textContent = msg.day + ' / 30'; }
+        };
+    }
+
+    // --- Init ---
+    loadFleet();
+    connectWS();
+    </script>
+</body>
+</html>

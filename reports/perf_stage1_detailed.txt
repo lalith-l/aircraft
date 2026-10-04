@@ -1,0 +1,3 @@
+DB Load 10k items: 0.082s
+Verify Store (Hash+Sig) 10k items: 5.758s
+Sort/Fold 10k items: 0.002s

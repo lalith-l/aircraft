@@ -33,14 +33,13 @@ def merge_stores(local_store: AppendOnlyStore, remote_items: Iterable[EvidenceIt
 
 def deterministic_fold(items: Iterable[EvidenceItem]) -> List[EvidenceItem]:
     """
-    Given a set of EvidenceItems (e.g. all items for a specific part),
-    returns the deterministic ordered sequence of active items.
+    Given a set of EvidenceItems, returns the deterministic ordered sequence of active items.
     
-    1. Sorts items by (t, id). This guarantees deterministic ordering
-       even if two items arrive with the exact same timestamp.
-    2. Filters out superseded items.
-    
-    The belief engine takes this sorted sequence and folds it into a belief.
+    1. Tracks superseded IDs.
+    2. Handles concurrent supersedes (multiple items superseding the same target).
+    3. Handles chains of corrections (A <- B <- C).
+    4. Filters out all superseded items.
+    5. Sorts the final active items by (t, id).
     """
     # 1. Gather all superseded IDs
     superseded_ids: Set[str] = set()
@@ -49,9 +48,12 @@ def deterministic_fold(items: Iterable[EvidenceItem]) -> List[EvidenceItem]:
             superseded_ids.add(item.supersedes)
             
     # 2. Filter out superseded items
+    # If A supersedes B, B is removed.
+    # If A and C both supersede B, B is removed. A and C remain (concurrent tie-break is just the final sort).
+    # If A supersedes B, and C supersedes A, then A and B are removed. C remains.
     active_items = [item for item in items if item.id not in superseded_ids]
     
-    # 3. Sort by event time `t`, tie-break by `id`
+    # 3. Sort by event time `t`, tie-break by `id` (this resolves concurrent supersedes deterministically)
     active_items.sort(key=lambda x: (x.t, x.id))
     
     return active_items

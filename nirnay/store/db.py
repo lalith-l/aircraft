@@ -147,5 +147,44 @@ class AppendOnlyStore:
             
         return [EvidenceItem.from_json(row['item_json']) for row in cur.fetchall()]
 
+    def verify_store(self) -> bool:
+        """
+        Recompute hashes, per-node chain links, and signatures for all items.
+        Returns True if the store is completely valid, raises ValueError if tampering is detected.
+        """
+        cur = self.conn.cursor()
+        cur.execute('SELECT node, item_json FROM evidence ORDER BY rowid ASC')
+        rows = cur.fetchall()
+        
+        node_latest_hash = {}
+        
+        for row in rows:
+            node = row['node']
+            item = EvidenceItem.from_json(row['item_json'])
+            
+            # 1. Verify Hash
+            if item.hash != item.compute_hash():
+                raise ValueError(f"Tamper detected: Hash mismatch for item {item.id}")
+                
+            # 2. Verify Signature
+            if not self.registry.is_known(item.node):
+                raise ValueError(f"Tamper detected: Unknown node {item.node}")
+            msg = json.dumps(item.canonical_dict(), sort_keys=True, separators=(",", ":"), default=str)
+            if not self.registry.verify(item.node, msg, item.sig):
+                raise ValueError(f"Tamper detected: Invalid signature for item {item.id}")
+                
+            # 3. Verify Chain (only for local node chain, assuming rowid order approximates local append order)
+            # In a distributed system, chain verification would need to order by the chain itself per node.
+            # Here we just check that prev_hash matches the previous item we saw from this node.
+            expected_prev = node_latest_hash.get(node, "")
+            if item.prev_hash != expected_prev:
+                # If we received items out of order via sync, this simple check might fail.
+                # For this prototype's verification, we enforce strict chain ordering on disk.
+                raise ValueError(f"Tamper detected: Chain break for node {node}. Expected {expected_prev}, got {item.prev_hash}")
+            
+            node_latest_hash[node] = item.hash
+            
+        return True
+
     def close(self):
         self.conn.close()

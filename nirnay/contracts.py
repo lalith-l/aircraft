@@ -10,11 +10,12 @@ Status: [REAL]
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
+import math
 import uuid
-from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from dataclasses import dataclass, field, fields, asdict
 from enum import Enum
 from typing import Optional
 
@@ -81,13 +82,16 @@ class EvidenceItem:
 
     Hash chains are per originating node.  The union of all nodes' chains
     is the part's evidence set.  Corrections append (supersedes), never delete.
+
+    All timestamps are UTC epoch seconds (float).  Payloads and likelihoods
+    are deep-copied at construction for immutability.
     """
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     part_sn: str = ""
     source: EvidenceSource = EvidenceSource.SENSOR
     node: str = ""                          # originating node id
-    t: float = 0.0                          # event time (epoch seconds)
-    t_logged: float = 0.0                   # when logged (epoch seconds)
+    t: float = 0.0                          # event time (UTC epoch seconds)
+    t_logged: float = 0.0                   # when logged (UTC epoch seconds)
     payload: dict = field(default_factory=dict)  # features, text, grade
     likelihood: dict = field(default_factory=dict)
     # likelihood is either:
@@ -99,11 +103,64 @@ class EvidenceItem:
     sig: str = ""                           # ed25519 signature by originating node
     supersedes: Optional[str] = None        # id of superseded item, or None
 
+    def __post_init__(self):
+        # --- Deep-copy mutable fields for immutability ---
+        object.__setattr__(self, 'payload', copy.deepcopy(self.payload))
+        object.__setattr__(self, 'likelihood', copy.deepcopy(self.likelihood))
+
+        # --- Validate source type ---
+        if not isinstance(self.source, EvidenceSource):
+            raise TypeError(
+                f"source must be EvidenceSource, got {type(self.source).__name__}"
+            )
+
+        # --- Reject NaN / Inf in numeric fields ---
+        for fname in ('t', 't_logged', 'weight'):
+            v = getattr(self, fname)
+            if not isinstance(v, (int, float)):
+                raise TypeError(f"{fname} must be numeric, got {type(v).__name__}")
+            if math.isnan(v) or math.isinf(v):
+                raise ValueError(f"{fname} must be finite, got {v}")
+
+        # --- Reject negative timestamps (must be UTC epoch seconds >= 0) ---
+        if self.t < 0:
+            raise ValueError(
+                f"t must be non-negative UTC epoch seconds, got {self.t}"
+            )
+        if self.t_logged < 0:
+            raise ValueError(
+                f"t_logged must be non-negative UTC epoch seconds, got {self.t_logged}"
+            )
+
+        # --- Validate weight in [0, 1] ---
+        if not (0.0 <= self.weight <= 1.0):
+            raise ValueError(f"weight must be in [0, 1], got {self.weight}")
+
+        # --- Validate likelihood shape ---
+        if 'per_state' in self.likelihood:
+            ps = self.likelihood['per_state']
+            if len(ps) != 5:
+                raise ValueError(
+                    f"per_state likelihood must have exactly 5 values "
+                    f"(one per HealthState), got {len(ps)}"
+                )
+            for i, v in enumerate(ps):
+                if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                    raise ValueError(f"per_state[{i}] must be finite, got {v}")
+
     def canonical_dict(self) -> dict:
-        """Return the dict used for hashing — excludes hash and sig fields."""
+        """Return the dict used for hashing.
+
+        Excludes ``hash`` and ``sig``.  Normalises enums to their string
+        values so that the JSON representation is deterministic across
+        Python versions and enum __str__ changes.
+        """
         d = asdict(self)
         d.pop("hash", None)
         d.pop("sig", None)
+        # Normalise enum to its value for deterministic serialisation
+        if isinstance(d.get("source"), EvidenceSource):
+            d["source"] = d["source"].value
         return d
 
     def compute_hash(self) -> str:

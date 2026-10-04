@@ -12,10 +12,10 @@ install:
 	$(PIP) install -r requirements.txt
 
 test:
-	$(PYTEST) tests/ -v --tb=short
+	PYTHONPATH=. $(PYTHON) -m pytest tests/ -v --tb=short
 
 test-cov:
-	$(PYTEST) tests/ -v --tb=short --cov=nirnay --cov-report=term-missing
+	PYTHONPATH=. $(PYTHON) -m pytest tests/ -v --tb=short --cov=nirnay --cov-report=term-missing
 
 lint:
 	$(PYTHON) -m py_compile nirnay/contracts.py
